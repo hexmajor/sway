@@ -404,20 +404,21 @@ static void update_border_geometry_floating(swayc_t *c, struct wlc_geometry *geo
 	c->actual_geometry = g;
 
 	swayc_t *output = swayc_parent_by_type(c, C_OUTPUT);
-	const struct wlc_size *res = wlc_output_get_resolution(output->handle);
+	struct wlc_size res;
+	wlc_output_get_scaled_size(output->handle, &res);
 
 	switch (c->border_type) {
 	case B_NONE:
 		break;
 	case B_PIXEL:
-		adjust_border_geometry(c, &g, res, c->border_thickness,
+		adjust_border_geometry(c, &g, &res, c->border_thickness,
 			c->border_thickness, c->border_thickness, c->border_thickness);
 		break;
 	case B_NORMAL:
 	{
 		int title_bar_height = config->font_height + 4; // borders + padding
 
-		adjust_border_geometry(c, &g, res, c->border_thickness,
+		adjust_border_geometry(c, &g, &res, c->border_thickness,
 			c->border_thickness, title_bar_height, c->border_thickness);
 
 		struct wlc_geometry title_bar = {
@@ -543,13 +544,15 @@ void update_geometry(swayc_t *container) {
 		gap = update_gap_geometry(container, &geometry);
 	}
 
+	swayc_t *output = swayc_parent_by_type(container, C_OUTPUT);
+	struct wlc_size size;
+	wlc_output_get_scaled_size(output->handle, &size);
+
 	if (swayc_is_fullscreen(container)) {
-		swayc_t *output = swayc_parent_by_type(container, C_OUTPUT);
-		const struct wlc_size *size = wlc_output_get_resolution(output->handle);
 		geometry.origin.x = 0;
 		geometry.origin.y = 0;
-		geometry.size.w = size->w;
-		geometry.size.h = size->h;
+		geometry.size.w = size.w;
+		geometry.size.h = size.h;
 		if (op->focused == ws) {
 			wlc_view_bring_to_front(container->handle);
 		}
@@ -569,16 +572,13 @@ void update_geometry(swayc_t *container) {
 
 		// handle hide_edge_borders
 		if (config->hide_edge_borders != E_NONE && (gap <= 0 || (config->smart_gaps && ws->children->length == 1))) {
-			swayc_t *output = swayc_parent_by_type(container, C_OUTPUT);
-			const struct wlc_size *size = wlc_output_get_resolution(output->handle);
-
 			if (config->hide_edge_borders == E_HORIZONTAL || config->hide_edge_borders == E_BOTH) {
 				if (geometry.origin.x == 0 || geometry.origin.x == container->x) {
 					// should work for swaybar at left
 					border_left = 0;
 				}
 
-				if (geometry.origin.x + geometry.size.w == size->w || geometry.size.w == container->width) {
+				if (geometry.origin.x + geometry.size.w == size.w || geometry.size.w == container->width) {
 					// should work for swaybar at right
 					border_right = 0;
 				}
@@ -590,7 +590,7 @@ void update_geometry(swayc_t *container) {
 					border_top = 0;
 				}
 
-				if (geometry.origin.y + geometry.size.h == size->h || geometry.size.h == container->height) {
+				if (geometry.origin.y + geometry.size.h == size.h || geometry.size.h == container->height) {
 					// this works for swaybar at bottom
 					border_bottom = 0;
 				}
@@ -726,7 +726,8 @@ static void arrange_windows_r(swayc_t *container, double width, double height) {
 		return;
 	case C_OUTPUT:
 		{
-			struct wlc_size resolution = *wlc_output_get_resolution(container->handle);
+			struct wlc_size resolution;
+			wlc_output_get_scaled_size(container->handle, &resolution);
 			width = resolution.w; height = resolution.h;
 			// output must have correct size due to e.g. seamless mouse,
 			// but a workspace might be smaller depending on panels.
